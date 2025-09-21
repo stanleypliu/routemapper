@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import Success from "./components/Success";
 import MapboxMap from "./components/MapboxMap";
 
+import Background from "@/assets/background.png";
+
 function App() {
   const [currentView, setCurrentView] = useState("authentication");
   const [authenticating, setAuthenticating] = useState(false);
@@ -101,39 +103,50 @@ function App() {
 
   return (
     <>
-      <div className="container ">
-        {currentView === "success" && <Success />}
+      <div className="relative w-screen h-screen">
         {currentView === "authentication" && (
-          <div className="flex justify-center items-center w-screen h-screen">
-            <div className="min-w-xl">
-              <h1 className="text-3xl font-extrabold text-center mb-10">
-                RouteMapper
-              </h1>
-              <Card>
-                <CardHeader>
-                  <h2 className="text-2xl text-center font-bold">
-                    Authenticate with Strava
-                  </h2>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <Button
-                    className="uppercase text-white cursor-pointer"
-                    onClick={authenticateWithStrava}
-                    disabled={authenticating}
-                  >
-                    <LoadingSpinner />
-                    {authenticating
-                      ? "Continue in the other window"
-                      : "Let's go!"}
-                  </Button>
-                </CardContent>
-              </Card>
+          <>
+            <div
+              className="absolute top-0 left-0 w-full h-full bg-cover bg-no-repeat"
+              style={{ backgroundImage: `url(${Background})` }}
+            ></div>
+            <div className="absolute top-0 left-0 w-full h-full bg-white opacity-70"></div>
+          </>
+        )}
+        <div className="relative z-10">
+          {currentView === "success" && <Success />}
+          {currentView === "authentication" && (
+            <div className="flex justify-center items-center w-screen h-screen">
+              <div className="min-w-xl">
+                <h1 className="text-3xl font-extrabold text-center mb-10">
+                  RouteMapper
+                </h1>
+                <Card>
+                  <CardHeader>
+                    <h2 className="text-2xl text-center font-bold">
+                      Authenticate with Strava
+                    </h2>
+                  </CardHeader>
+                  <CardContent className="flex justify-center">
+                    <Button
+                      className="uppercase text-white cursor-pointer"
+                      onClick={authenticateWithStrava}
+                      disabled={authenticating}
+                    >
+                      <LoadingSpinner />
+                      {authenticating
+                        ? "Continue in the other window"
+                        : "Let's go!"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
-        )}
-        {currentView === "authenticated" && accessToken && (
-          <MapboxMap accessToken={accessToken} />
-        )}
+          )}
+          {currentView === "authenticated" && accessToken && (
+            <MapboxMap accessToken={accessToken} />
+          )}
+        </div>
       </div>
     </>
   );
