@@ -2,17 +2,16 @@ import type { Activity } from "@/types/strava";
 import { useEffect, useRef, useState } from "react";
 import mapboxgl, { type Map } from "mapbox-gl";
 import { LoaderIcon } from "lucide-react";
+import { decode } from "@googlemaps/polyline-codec";
 
 import { Card } from "./ui/card";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
-  const routes = useRef<Activity[] | null>(null);
+  const [routes, setRoutes] = useState<Activity[] | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const mapRef = useRef<Map | null>(null);
-  const mapContainerRef = useRef<HTMLElement | string>("");
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -30,35 +29,83 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           throw new Error(`Failed to fetch activities: ${response.status}`);
         }
         const activities: Activity[] = await response.json();
-
-        routes.current = activities.filter((activity) => !!activity.map);
+        const filteredRoutes = activities.filter(
+          (activity) => activity.map && activity.map.summary_polyline
+        );
+        setRoutes(filteredRoutes);
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching activities:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchActivities();
+    if (accessToken) {
+      fetchActivities();
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      center: [-122.4194, 37.7749], // Default to San Francisco
+      zoom: 10,
+      style: "mapbox://styles/mapbox/streets-v11",
+    });
+
+    map.on("load", () => {
+      if (routes) {
+        routes.forEach((route, index) => {
+          const routeId = `route_${index}`;
+          if (map.getSource(routeId)) return;
+
+          const coordinates = decode(route.map.summary_polyline) || [];
+
+          if (coordinates.length > 0) {
+            map.addSource(routeId, {
+              type: "geojson",
+              data: {
+                type: "Feature",
+                properties: {},
+                geometry: {
+                  type: "LineString",
+                  coordinates: coordinates,
+                },
+              },
+            });
+
+            map.addLayer({
+              id: routeId,
+              type: "line",
+              source: routeId,
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": "#E34A01",
+                "line-width": 2,
+              },
+            });
+          }
+        });
+      }
+    });
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition((position) => {
-        mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-        mapRef.current = new mapboxgl.Map({
-          container: mapContainerRef.current,
-          center: [position.coords.longitude, position.coords.latitude],
-          zoom: 11
-        });
+        map.setCenter([position.coords.longitude, position.coords.latitude]);
+        map.setZoom(11);
       });
-    } else {
-      // TODO - handle via an alert or toast about incompability
-      console.log('Geolocation API not available')
     }
 
     return () => {
-      mapRef.current?.remove();
+      map.remove();
     };
-  }, []);
+  }, [routes]);
 
   return (
     <>
@@ -67,12 +114,12 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
         className="w-screen h-screen bg-neutral-400 flex justify-center items-center"
         ref={mapContainerRef}
       >
-          {loading && 
+        {loading && (
           <Card className="flex-row p-3 bg-white z-10 items-center">
             <LoaderIcon className="animate-spin" />
             <h4 className="text-xl">Loading your routes...</h4>
           </Card>
-          }
+        )}
       </div>
     </>
   );

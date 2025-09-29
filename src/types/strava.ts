@@ -48,6 +48,7 @@ interface Athlete {
 
 export interface Map {
   id: string;
-  polyline: string | null;
+  summary_polyline: string;
+  polyline?: string | null;
   resource_state: number;
 }
