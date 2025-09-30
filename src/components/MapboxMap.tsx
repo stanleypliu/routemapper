@@ -8,9 +8,12 @@ import { Card } from "./ui/card";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { COLORS } from "@/lib/utils";
+
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   const [routes, setRoutes] = useState<Activity[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [map, setMap] = useState<Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,8 +38,6 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
         setRoutes(filteredRoutes);
       } catch (error) {
         console.error("Error fetching activities:", error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -49,63 +50,74 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     if (!mapContainerRef.current) return;
 
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-    const map = new mapboxgl.Map({
+    const mapInstance = new mapboxgl.Map({
       container: mapContainerRef.current,
-      center: [-122.4194, 37.7749], // Default to San Francisco
-      zoom: 10,
       style: "mapbox://styles/mapbox/streets-v11",
-    });
-
-    map.on("load", () => {
-      if (routes) {
-        routes.forEach((route, index) => {
-          const routeId = `route_${index}`;
-          if (map.getSource(routeId)) return;
-
-          const coordinates = decode(route.map.summary_polyline) || [];
-
-          if (coordinates.length > 0) {
-            map.addSource(routeId, {
-              type: "geojson",
-              data: {
-                type: "Feature",
-                properties: {},
-                geometry: {
-                  type: "LineString",
-                  coordinates: coordinates,
-                },
-              },
-            });
-
-            map.addLayer({
-              id: routeId,
-              type: "line",
-              source: routeId,
-              layout: {
-                "line-join": "round",
-                "line-cap": "round",
-              },
-              paint: {
-                "line-color": "#E34A01",
-                "line-width": 2,
-              },
-            });
-          }
-        });
-      }
     });
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition((position) => {
-        map.setCenter([position.coords.longitude, position.coords.latitude]);
-        map.setZoom(11);
+        mapInstance.setCenter([
+          position.coords.longitude,
+          position.coords.latitude,
+        ]);
+        mapInstance.setZoom(11);
       });
     }
 
+    setMap(mapInstance);
+
     return () => {
-      map.remove();
+      mapInstance.remove();
     };
-  }, [routes]);
+  }, []);
+
+  useEffect(() => {
+    if (!map || !routes) return;
+
+    map.on("load", () => {
+      routes.forEach((route, index) => {
+        const routeId = `route_${index}`;
+        if (map.getSource(routeId)) return;
+
+        const coordinates = decode(route.map.summary_polyline).map((coord) => [
+          coord[1],
+          coord[0],
+        ]);
+
+        if (coordinates.length > 0) {
+          map.addSource(routeId, {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                type: "LineString",
+                coordinates: coordinates,
+              },
+            },
+          });
+
+          map.addLayer({
+            id: routeId,
+            type: "line",
+            source: routeId,
+            layout: {
+              "line-join": "round",
+              "line-cap": "round",
+            },
+            paint: {
+              "line-color":
+                COLORS[Math.floor(Math.random() * (COLORS.length - 1))],
+              "line-width": 2,
+            },
+          });
+        }
+      });
+    });
+
+    setLoading(false);
+  }, [map, routes]);
 
   return (
     <>
