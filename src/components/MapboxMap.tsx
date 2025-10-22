@@ -12,6 +12,12 @@ import { LoaderIcon } from "lucide-react";
 import { decode } from "@googlemaps/polyline-codec";
 
 import { Card } from "./ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -30,6 +36,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     latitude: number;
     zoom: number;
   } | null>(null);
+  const [years, setYears] = useState<number[]>([]);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -67,6 +74,15 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           color: COLORS[Math.floor(Math.random() * (COLORS.length - 1))],
         }));
         setRoutes(routesWithColor);
+
+        const years = [
+          ...new Set(
+            filteredRoutes.map((route) =>
+              new Date(route.start_date).getFullYear()
+            )
+          ),
+        ];
+        setYears(years);
       } catch (error) {
         console.error("Error fetching activities:", error);
       }
@@ -107,6 +123,18 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           </Card>
         </div>
       )}
+      <div className="absolute top-2 left-5 z-20">
+        <DropdownMenu>
+          <DropdownMenuTrigger>Select year</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {loading && <LoaderIcon className="animate-spin" />}
+            {years.length > 0 &&
+              years.map((year) => (
+                <DropdownMenuItem key={year}>{year}</DropdownMenuItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       {initialViewState && (
         <Map
           mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
@@ -121,6 +149,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           }
           style={{ zIndex: 10 }}
         >
+          <></>
           <NavigationControl />
           {routes &&
             routes.map((route, index) => {
@@ -157,6 +186,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
             })}
           {selectedActivity && (
             <Popup
+              className="activity-popup"
               longitude={clickedPoint?.lng || 100}
               latitude={clickedPoint?.lat || 100}
               key={selectedActivity.id}
@@ -164,7 +194,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
               onClose={() => setSelectedActivity(null)}
             >
               <h4 className="text-lg">{selectedActivity.name}</h4>
-              <b>{selectedActivity.start_date}</b>
+              <p className="mb-3 font-bold">{selectedActivity.start_date}</p>
               <p>{`Distance travelled: ${(
                 selectedActivity.distance / 1000
               ).toFixed(2)} km`}</p>

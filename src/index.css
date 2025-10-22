@@ -123,3 +123,7 @@
     min-height: 100vh;
   }
 }
+
+.activity-popup .mapboxgl-popup-content {
+  @apply rounded-lg p-3;
+}
