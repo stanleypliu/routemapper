@@ -39,6 +39,7 @@ export interface Activity {
   description: string | null;
   calories: number;
   segment_efforts: any[];
+  color: string;
 }
 
 interface Athlete {
