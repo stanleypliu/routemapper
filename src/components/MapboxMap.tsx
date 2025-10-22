@@ -1,6 +1,12 @@
 import type { Activity } from "@/types/strava";
 import { useEffect, useState } from "react";
-import Map, { Layer, Source, NavigationControl } from "react-map-gl/mapbox";
+import Map, {
+  Layer,
+  Source,
+  NavigationControl,
+  Popup,
+  type LngLat,
+} from "react-map-gl/mapbox";
 import type { MapMouseEvent } from "react-map-gl/mapbox";
 import { LoaderIcon } from "lucide-react";
 import { decode } from "@googlemaps/polyline-codec";
@@ -13,9 +19,12 @@ import { COLORS } from "@/lib/utils";
 
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   const [routes, setRoutes] = useState<Activity[] | null>(null);
+  const [clickedPoint, setClickedPoint] = useState<LngLat | null>(null);
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState("auto");
-  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null
+  );
   const [initialViewState, setInitialViewState] = useState<{
     longitude: number;
     latitude: number;
@@ -74,9 +83,13 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
       const clickedRoute = e.features[0].layer?.id;
 
       if (clickedRoute && routes) {
+        setClickedPoint(e.lngLat);
         const index = Number(clickedRoute.split("_")[1]);
         setSelectedActivity(routes[index]);
+        console.log(selectedActivity);
       }
+    } else {
+      setSelectedActivity(null);
     }
   };
 
@@ -142,6 +155,26 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
                 </Source>
               );
             })}
+          {selectedActivity && (
+            <Popup
+              longitude={clickedPoint?.lng || 100}
+              latitude={clickedPoint?.lat || 100}
+              key={selectedActivity.id}
+              anchor="bottom"
+              onClose={() => setSelectedActivity(null)}
+            >
+              <h4 className="text-lg">{selectedActivity.name}</h4>
+              <b>{selectedActivity.start_date}</b>
+              <p>{`Distance travelled: ${(
+                selectedActivity.distance / 1000
+              ).toFixed(2)} km`}</p>
+              <p>{`Average heart rate: ${
+                selectedActivity.average_heartrate + " BPM" || "N/A"
+              }`}</p>
+              <p>{`Average speed: ${selectedActivity.average_speed}`}</p>
+              <p>{`Kudos ❤️: ${selectedActivity.kudos_count}`}</p>
+            </Popup>
+          )}
         </Map>
       )}
     </div>

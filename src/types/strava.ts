@@ -1,4 +1,5 @@
 export interface Activity {
+  average_heartrate: any;
   id: number;
   resource_state: number;
   external_id: string | null;
