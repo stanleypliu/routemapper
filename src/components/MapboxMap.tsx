@@ -15,6 +15,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   const [routes, setRoutes] = useState<Activity[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState("auto");
+  const [selectedActivity, setSelectedActivity] = useState(null);
   const [initialViewState, setInitialViewState] = useState<{
     longitude: number;
     latitude: number;
@@ -70,8 +71,12 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
 
   const handleMapClick = (e: MapMouseEvent) => {
     if (e.features && e.features.length > 0) {
-      const feature = e.features[0];
-      console.log("clicked", feature);
+      const clickedRoute = e.features[0].layer?.id;
+
+      if (clickedRoute && routes) {
+        const index = Number(clickedRoute.split("_")[1]);
+        setSelectedActivity(routes[index]);
+      }
     }
   };
 
@@ -82,10 +87,12 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   return (
     <div className="w-screen h-screen bg-neutral-400">
       {loading && (
-        <Card className="flex-row p-3 bg-white z-10 items-center">
-          <LoaderIcon className="animate-spin" />
-          <h4 className="text-xl">Loading your routes...</h4>
-        </Card>
+        <div className="absolute top-0 left-0 w-screen h-screen flex justify-center items-center z-20">
+          <Card className="flex-row p-3 bg-white items-center w-auto">
+            <LoaderIcon className="animate-spin" />
+            <h4 className="text-xl">Loading your routes...</h4>
+          </Card>
+        </div>
       )}
       {initialViewState && (
         <Map
@@ -99,6 +106,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           interactiveLayerIds={
             routes?.map((_, index) => `route_${index}`) || []
           }
+          style={{ zIndex: 10 }}
         >
           <NavigationControl />
           {routes &&

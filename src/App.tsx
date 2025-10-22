@@ -9,14 +9,30 @@ import MapboxMap from "./components/MapboxMap";
 import Background from "@/assets/background.png";
 
 function App() {
-  const [currentView, setCurrentView] = useState("authentication");
+  const [currentView, setCurrentView] = useState("homeScreen");
   const [authenticating, setAuthenticating] = useState(false);
-  const [expiresAt, setExpiresAt] = useState(null);
-  const [refreshToken, setRefreshToken] = useState(null);
+  const [checkingAccessToken, setCheckingAccessToken] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const isExchanging = useRef(false);
 
   useEffect(() => {
+    if (
+      localStorage.getItem("accessToken") &&
+      localStorage.getItem("expiresAt") &&
+      localStorage.getItem("refreshToken")
+    ) {
+      const expiresAt = Number(localStorage.getItem("expiresAt"));
+      const accessToken = localStorage.getItem("accessToken");
+      setAccessToken(accessToken);
+
+      if (expiresAt * 1000 < Date.now()) {
+        exchangeToken();
+      }
+
+      setCurrentView("authenticated");
+      setCheckingAccessToken(false);
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const codeParam = urlParams.get("code");
 
@@ -27,7 +43,7 @@ function App() {
       );
     }
 
-    const handleAuthMessage = async (event: MessageEvent) => {
+    async function handleAuthMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) {
         return;
       }
@@ -39,19 +55,30 @@ function App() {
       ) {
         await exchangeToken(event.data.code);
       }
-    };
+    }
 
-    const exchangeToken = async (code: string) => {
+    async function exchangeToken(code?: string) {
       isExchanging.current = true;
       try {
+        const params: Record<string, string> = {
+          client_secret: import.meta.env.VITE_CLIENT_SECRET,
+          client_id: import.meta.env.VITE_CLIENT_ID,
+          grant_type: accessToken ? "refresh_token" : "authorization_code",
+        };
+
+        if (!accessToken && code) {
+          params.code = code;
+        }
+
+        if (accessToken && localStorage.getItem("refresh_token")) {
+          params.refresh_token = localStorage.getItem(
+            "refresh_token"
+          ) as string;
+        }
+
         const response = await fetch("https://www.strava.com/oauth/token", {
           method: "POST",
-          body: new URLSearchParams({
-            client_secret: import.meta.env.VITE_CLIENT_SECRET,
-            client_id: import.meta.env.VITE_CLIENT_ID,
-            code,
-            grant_type: "authorization_code",
-          }),
+          body: new URLSearchParams(params),
         });
 
         if (!response.ok) {
@@ -60,17 +87,18 @@ function App() {
 
         const result = await response.json();
 
-        setExpiresAt(result.expires_at);
-        setRefreshToken(result.refresh_token);
+        localStorage.setItem("accessToken", result.access_token);
         setAccessToken(result.access_token);
+        localStorage.setItem("refreshToken", result.refresh_token);
+        localStorage.setItem("expiresAt", result.expires_at);
         setCurrentView("authenticated");
-      } catch (error) {
+      } catch (error: any) {
         console.error(error.message);
       } finally {
         setAuthenticating(false);
         isExchanging.current = false;
       }
-    };
+    }
 
     window.addEventListener("message", handleAuthMessage);
 
@@ -92,7 +120,7 @@ function App() {
       import.meta.env.VITE_CLIENT_ID
     }&response_type=code&redirect_uri=${
       window.location.href
-    }success&approval_prompt=force&scope=activity:read`;
+    }success&approval_prompt=auto&scope=activity:read`;
 
     window.open(oauthUrl);
   }
@@ -104,7 +132,7 @@ function App() {
   return (
     <>
       <div className="relative w-screen h-screen">
-        {currentView === "authentication" && (
+        {currentView === "homeScreen" && (
           <>
             <div
               className="absolute top-0 left-0 w-full h-full bg-cover bg-no-repeat"
@@ -115,7 +143,7 @@ function App() {
         )}
         <div className="relative z-10">
           {currentView === "success" && <Success />}
-          {currentView === "authentication" && (
+          {currentView === "homeScreen" && (
             <div className="flex justify-center items-center w-screen h-screen">
               <div className="min-w-xl">
                 <h1 className="text-3xl font-extrabold text-center mb-10">
@@ -123,9 +151,16 @@ function App() {
                 </h1>
                 <Card>
                   <CardHeader>
-                    <h2 className="text-2xl text-center font-bold">
-                      Authenticate with Strava
-                    </h2>
+                    {!accessToken && (
+                      <h2 className="text-2xl text-center font-bold">
+                        Authenticate With Strava
+                      </h2>
+                    )}
+                    {!!accessToken && checkingAccessToken && (
+                      <h2 className="text-2xl text-center font-bold">
+                        Checking Access Token...
+                      </h2>
+                    )}
                   </CardHeader>
                   <CardContent className="flex justify-center">
                     <Button
