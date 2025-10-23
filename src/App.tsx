@@ -15,6 +15,48 @@ function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const isExchanging = useRef(false);
 
+  async function exchangeToken(code?: string) {
+    isExchanging.current = true;
+    try {
+      const storedAccessToken = localStorage.getItem("accessToken");
+      const params: Record<string, string> = {
+        client_secret: import.meta.env.VITE_CLIENT_SECRET,
+        client_id: import.meta.env.VITE_CLIENT_ID,
+        grant_type: storedAccessToken ? "refresh_token" : "authorization_code",
+      };
+
+      if (!storedAccessToken && code) {
+        params.code = code;
+      }
+
+      if (storedAccessToken && localStorage.getItem("refreshToken")) {
+        params.refresh_token = localStorage.getItem("refreshToken") as string;
+      }
+
+      const response = await fetch("https://www.strava.com/oauth/token", {
+        method: "POST",
+        body: new URLSearchParams(params),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Response status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      localStorage.setItem("accessToken", result.access_token);
+      setAccessToken(result.access_token);
+      localStorage.setItem("refreshToken", result.refresh_token);
+      localStorage.setItem("expiresAt", result.expires_at);
+      setCurrentView("authenticated");
+    } catch (error: any) {
+      console.error(error.message);
+    } finally {
+      setAuthenticating(false);
+      isExchanging.current = false;
+    }
+  }
+
   useEffect(() => {
     if (
       localStorage.getItem("accessToken") &&
@@ -22,14 +64,13 @@ function App() {
       localStorage.getItem("refreshToken")
     ) {
       const expiresAt = Number(localStorage.getItem("expiresAt"));
-      const accessToken = localStorage.getItem("accessToken");
-      setAccessToken(accessToken);
+      const token = localStorage.getItem("accessToken");
+      setAccessToken(token);
 
       if (expiresAt * 1000 < Date.now()) {
         exchangeToken();
       }
 
-      setCurrentView("authenticated");
       setCheckingAccessToken(false);
     }
 
@@ -54,49 +95,6 @@ function App() {
         !isExchanging.current
       ) {
         await exchangeToken(event.data.code);
-      }
-    }
-
-    async function exchangeToken(code?: string) {
-      isExchanging.current = true;
-      try {
-        const params: Record<string, string> = {
-          client_secret: import.meta.env.VITE_CLIENT_SECRET,
-          client_id: import.meta.env.VITE_CLIENT_ID,
-          grant_type: accessToken ? "refresh_token" : "authorization_code",
-        };
-
-        if (!accessToken && code) {
-          params.code = code;
-        }
-
-        if (accessToken && localStorage.getItem("refresh_token")) {
-          params.refresh_token = localStorage.getItem(
-            "refresh_token"
-          ) as string;
-        }
-
-        const response = await fetch("https://www.strava.com/oauth/token", {
-          method: "POST",
-          body: new URLSearchParams(params),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Response status: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        localStorage.setItem("accessToken", result.access_token);
-        setAccessToken(result.access_token);
-        localStorage.setItem("refreshToken", result.refresh_token);
-        localStorage.setItem("expiresAt", result.expires_at);
-        setCurrentView("authenticated");
-      } catch (error: any) {
-        console.error(error.message);
-      } finally {
-        setAuthenticating(false);
-        isExchanging.current = false;
       }
     }
 
@@ -151,21 +149,26 @@ function App() {
                 </h1>
                 <Card>
                   <CardHeader>
-                    {!accessToken && (
+                    {!localStorage.getItem("accessToken") && (
                       <h2 className="text-2xl text-center font-bold">
                         Authenticate With Strava
                       </h2>
                     )}
-                    {!!accessToken && checkingAccessToken && (
-                      <h2 className="text-2xl text-center font-bold">
-                        Checking Access Token...
-                      </h2>
-                    )}
+                    {localStorage.getItem("accessToken") &&
+                      checkingAccessToken && (
+                        <h2 className="text-2xl text-center font-bold">
+                          Checking Access Token...
+                        </h2>
+                      )}
                   </CardHeader>
                   <CardContent className="flex justify-center">
                     <Button
                       className="uppercase text-white cursor-pointer"
-                      onClick={authenticateWithStrava}
+                      onClick={
+                        localStorage.getItem("accessToken")
+                          ? () => setCurrentView("authenticated")
+                          : authenticateWithStrava
+                      }
                       disabled={authenticating}
                     >
                       <LoadingSpinner />

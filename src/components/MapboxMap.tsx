@@ -22,6 +22,7 @@ import {
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import { COLORS } from "@/lib/utils";
+import { Button } from "./ui/button";
 
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   const [routes, setRoutes] = useState<Activity[] | null>(null);
@@ -37,6 +38,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     zoom: number;
   } | null>(null);
   const [years, setYears] = useState<number[]>([]);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -50,45 +52,55 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchActivities = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(
-          "https://www.strava.com/api/v3/athlete/activities",
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch activities: ${response.status}`);
+  async function fetchMoreActivities() {
+    const nextPage = page + 1;
+    await fetchActivities(nextPage);
+    setPage(nextPage);
+  }
+
+  const fetchActivities = async (page = 1) => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://www.strava.com/api/v3/athlete/activities?page=${page}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         }
-        const activities: Activity[] = await response.json();
-        const filteredRoutes = activities.filter(
-          (activity) => activity.map && activity.map.summary_polyline
-        );
-        const routesWithColor = filteredRoutes.map((route) => ({
-          ...route,
-          color: COLORS[Math.floor(Math.random() * (COLORS.length - 1))],
-        }));
-        setRoutes(routesWithColor);
-
-        const years = [
-          ...new Set(
-            filteredRoutes.map((route) =>
-              new Date(route.start_date).getFullYear()
-            )
-          ),
-        ];
-        setYears(years);
-      } catch (error) {
-        console.error("Error fetching activities:", error);
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch activities: ${response.status}`);
       }
-      setLoading(false);
-    };
+      const activities: Activity[] = await response.json();
+      const filteredRoutes = activities.filter(
+        (activity) => activity.map && activity.map.summary_polyline
+      );
+      const routesWithColor = filteredRoutes.map((route) => ({
+        ...route,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      }));
+      if (!routes || routes.length === 0) {
+        setRoutes(routesWithColor);
+      } else {
+        setRoutes(routes.concat(routesWithColor));
+      }
 
+      const years = [
+        ...new Set(
+          filteredRoutes.map((route) =>
+            new Date(route.start_date).getFullYear()
+          )
+        ),
+      ];
+      setYears(years);
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     if (accessToken) {
       fetchActivities();
     }
@@ -102,7 +114,6 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
         setClickedPoint(e.lngLat);
         const index = Number(clickedRoute.split("_")[1]);
         setSelectedActivity(routes[index]);
-        console.log(selectedActivity);
       }
     } else {
       setSelectedActivity(null);
@@ -125,15 +136,28 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
       )}
       <div className="absolute top-2 left-5 z-20">
         <DropdownMenu>
-          <DropdownMenuTrigger>Select year</DropdownMenuTrigger>
-          <DropdownMenuContent>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">Select Year</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
             {loading && <LoaderIcon className="animate-spin" />}
             {years.length > 0 &&
               years.map((year) => (
-                <DropdownMenuItem key={year}>{year}</DropdownMenuItem>
+                <DropdownMenuItem
+                  key={year}
+                  onClick={async () => await fetchActivities()}
+                >
+                  {year}
+                </DropdownMenuItem>
               ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+      <div className="absolute bottom-2 left-5 z-20">
+        <Card className="px-2">
+          Showing your last {routes?.length} activities
+          <Button onClick={fetchMoreActivities}>Load more</Button>
+        </Card>
       </div>
       {initialViewState && (
         <Map
@@ -199,7 +223,9 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
                 selectedActivity.distance / 1000
               ).toFixed(2)} km`}</p>
               <p>{`Average heart rate: ${
-                selectedActivity.average_heartrate + " BPM" || "N/A"
+                selectedActivity.average_heartrate
+                  ? selectedActivity.average_heartrate + " BPM"
+                  : "N/A"
               }`}</p>
               <p>{`Average speed: ${selectedActivity.average_speed}`}</p>
               <p>{`Kudos ❤️: ${selectedActivity.kudos_count}`}</p>
