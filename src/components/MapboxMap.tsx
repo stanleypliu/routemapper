@@ -15,6 +15,7 @@ import { Card } from "./ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -25,7 +26,7 @@ import { COLORS } from "@/lib/utils";
 import { Button } from "./ui/button";
 
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
-  const [routes, setRoutes] = useState<Activity[] | null>(null);
+  const [routes, setRoutes] = useState<Activity[]>([]);
   const [clickedPoint, setClickedPoint] = useState<LngLat | null>(null);
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState("auto");
@@ -37,8 +38,9 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     latitude: number;
     zoom: number;
   } | null>(null);
-  const [years, setYears] = useState<number[]>([]);
+  const [years, setYears] = useState<{ year: number; checked: boolean }[]>([]);
   const [page, setPage] = useState(1);
+  const [displayedRoutes, setDisplayedRoutes] = useState(routes);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -58,17 +60,36 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     setPage(nextPage);
   }
 
-  const fetchActivities = async (page = 1) => {
+  useEffect(() => {
+    const selectedYears = years.filter((y) => y.checked).map((y) => y.year);
+    const filteredRoutes = routes.filter((route) =>
+      selectedYears.includes(new Date(route.start_date).getFullYear())
+    );
+
+    setDisplayedRoutes(filteredRoutes);
+  }, [years]);
+
+  const fetchActivities = async (page = 1, year?: number) => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://www.strava.com/api/v3/athlete/activities?page=${page}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const url = new URL("https://www.strava.com/api/v3/athlete/activities");
+
+      url.searchParams.append("page", String(page));
+
+      if (year) {
+        const startOfYear = Math.floor(new Date(year, 0, 1).getTime() / 1000);
+        const endOfYear = Math.floor(
+          new Date(year, 11, 31, 23, 59, 59).getTime() / 1000
+        );
+        url.searchParams.append("before", String(endOfYear));
+        url.searchParams.append("after", String(startOfYear));
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch activities: ${response.status}`);
       }
@@ -85,20 +106,34 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
       } else {
         setRoutes(routes.concat(routesWithColor));
       }
-
-      const years = [
-        ...new Set(
-          filteredRoutes.map((route) =>
-            new Date(route.start_date).getFullYear()
-          )
-        ),
-      ];
-      setYears(years);
     } catch (error) {
       console.error("Error fetching activities:", error);
     }
     setLoading(false);
   };
+
+  function handleYearChange(year: number) {
+    setYears((prevYears) => {
+      return prevYears.map((yearObject) =>
+        yearObject.year === year
+          ? { ...yearObject, checked: !yearObject.checked }
+          : yearObject
+      );
+    });
+  }
+
+  useEffect(() => {
+    const years = [
+      ...new Set(
+        routes.map((route) => new Date(route.start_date).getFullYear())
+      ),
+    ];
+    const yearObjects = years.map((year) => ({
+      year,
+      checked: true,
+    }));
+    setYears(yearObjects);
+  }, [routes]);
 
   useEffect(() => {
     if (accessToken) {
@@ -142,20 +177,21 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           <DropdownMenuContent align="start">
             {loading && <LoaderIcon className="animate-spin" />}
             {years.length > 0 &&
-              years.map((year) => (
-                <DropdownMenuItem
-                  key={year}
-                  onClick={async () => await fetchActivities()}
+              years.map((yearObject) => (
+                <DropdownMenuCheckboxItem
+                  key={yearObject.year}
+                  checked={yearObject.checked}
+                  onCheckedChange={() => handleYearChange(yearObject.year)}
                 >
-                  {year}
-                </DropdownMenuItem>
+                  {yearObject.year}
+                </DropdownMenuCheckboxItem>
               ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <div className="absolute bottom-2 left-5 z-20">
         <Card className="px-2">
-          Showing your last {routes?.length} activities
+          Showing your last {displayedRoutes?.length} activities
           <Button onClick={fetchMoreActivities}>Load more</Button>
         </Card>
       </div>
@@ -169,14 +205,14 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           onMouseLeave={handlePointerChange}
           cursor={cursor}
           interactiveLayerIds={
-            routes?.map((_, index) => `route_${index}`) || []
+            displayedRoutes?.map((_, index) => `route_${index}`) || []
           }
           style={{ zIndex: 10 }}
         >
           <></>
           <NavigationControl />
-          {routes &&
-            routes.map((route, index) => {
+          {displayedRoutes &&
+            displayedRoutes.map((route, index) => {
               const routeId = `route_${index}`;
               const coordinates = decode(route.map.summary_polyline).map(
                 (coord) => [coord[1], coord[0]]
