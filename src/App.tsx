@@ -104,7 +104,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (window.location.pathname === "/success") {
+    if (window.location.pathname.includes("/success")) {
       setCurrentView("success");
     }
   }, [window.location.pathname]);
