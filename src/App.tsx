@@ -12,24 +12,25 @@ function App() {
   const [currentView, setCurrentView] = useState("homeScreen");
   const [authenticating, setAuthenticating] = useState(false);
   const [checkingAccessToken, setCheckingAccessToken] = useState(true);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => {
+    return localStorage.getItem("accessToken");
+  });
   const isExchanging = useRef(false);
 
   async function exchangeToken(code?: string) {
     isExchanging.current = true;
     try {
-      const storedAccessToken = localStorage.getItem("accessToken");
       const params: Record<string, string> = {
         client_secret: import.meta.env.VITE_CLIENT_SECRET,
         client_id: import.meta.env.VITE_CLIENT_ID,
-        grant_type: storedAccessToken ? "refresh_token" : "authorization_code",
+        grant_type: accessToken ? "refresh_token" : "authorization_code",
       };
 
-      if (!storedAccessToken && code) {
+      if (!accessToken && code) {
         params.code = code;
       }
 
-      if (storedAccessToken && localStorage.getItem("refreshToken")) {
+      if (accessToken && localStorage.getItem("refreshToken")) {
         params.refresh_token = localStorage.getItem("refreshToken") as string;
       }
 
@@ -59,13 +60,10 @@ function App() {
 
   useEffect(() => {
     if (
-      localStorage.getItem("accessToken") &&
       localStorage.getItem("expiresAt") &&
       localStorage.getItem("refreshToken")
     ) {
       const expiresAt = Number(localStorage.getItem("expiresAt"));
-      const token = localStorage.getItem("accessToken");
-      setAccessToken(token);
 
       if (expiresAt * 1000 < Date.now()) {
         exchangeToken();
@@ -148,24 +146,25 @@ function App() {
                   RouteMapper
                 </h1>
                 <Card>
-                  <CardHeader>
-                    {!localStorage.getItem("accessToken") && (
+                  {!accessToken && (
+                    <CardHeader>
                       <h2 className="text-2xl text-center font-bold">
                         Authenticate With Strava
                       </h2>
-                    )}
-                    {localStorage.getItem("accessToken") &&
-                      checkingAccessToken && (
-                        <h2 className="text-2xl text-center font-bold">
-                          Checking Access Token...
-                        </h2>
-                      )}
-                  </CardHeader>
+                    </CardHeader>
+                  )}
+                  {accessToken && checkingAccessToken && (
+                    <CardHeader>
+                      <h2 className="text-2xl text-center font-bold">
+                        Checking Access Token...
+                      </h2>
+                    </CardHeader>
+                  )}
                   <CardContent className="flex justify-center">
                     <Button
                       className="uppercase text-white cursor-pointer"
                       onClick={
-                        localStorage.getItem("accessToken")
+                        accessToken
                           ? () => setCurrentView("authenticated")
                           : authenticateWithStrava
                       }

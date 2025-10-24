@@ -16,7 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
@@ -40,7 +39,6 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   } | null>(null);
   const [years, setYears] = useState<{ year: number; checked: boolean }[]>([]);
   const [page, setPage] = useState(1);
-  // const [displayedRoutes, setDisplayedRoutes] = useState(routes);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -67,7 +65,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     );
   }, [years, routes]);
 
-  const fetchActivities = async (page = 1, year?: number) => {
+  async function fetchActivities(page = 1, year?: number) {
     setLoading(true);
     try {
       const url = new URL("https://www.strava.com/api/v3/athlete/activities");
@@ -108,7 +106,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
       console.error("Error fetching activities:", error);
     }
     setLoading(false);
-  };
+  }
 
   function handleYearChange(year: number) {
     setYears((prevYears) => {
@@ -121,16 +119,23 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   }
 
   useEffect(() => {
-    const years = [
+    const newYears = [
       ...new Set(
         routes.map((route) => new Date(route.start_date).getFullYear())
       ),
     ];
-    const yearObjects = years.map((year) => ({
-      year,
-      checked: true,
-    }));
-    setYears(yearObjects);
+
+    setYears((prevYears) => {
+      const existingYears = prevYears.map((y) => y.year);
+      const yearsToAdd = newYears.filter(
+        (year) => !existingYears.includes(year)
+      );
+
+      return [
+        ...prevYears,
+        ...yearsToAdd.map((year) => ({ year, checked: true })),
+      ];
+    });
   }, [routes]);
 
   useEffect(() => {
@@ -139,7 +144,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     }
   }, [accessToken]);
 
-  const handleMapClick = (e: MapMouseEvent) => {
+  function handleMapClick(e: MapMouseEvent) {
     if (e.features && e.features.length > 0) {
       const clickedRoute = e.features[0].layer?.id;
 
@@ -151,11 +156,11 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     } else {
       setSelectedActivity(null);
     }
-  };
+  }
 
-  const handlePointerChange = () => {
+  function handlePointerChange() {
     cursor === "pointer" ? setCursor("auto") : setCursor("pointer");
-  };
+  }
 
   return (
     <div className="w-screen h-screen bg-neutral-400">
@@ -180,6 +185,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
                   key={yearObject.year}
                   checked={yearObject.checked}
                   onCheckedChange={() => handleYearChange(yearObject.year)}
+                  onSelect={(event) => event.preventDefault()}
                 >
                   {yearObject.year}
                 </DropdownMenuCheckboxItem>
