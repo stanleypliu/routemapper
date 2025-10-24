@@ -1,5 +1,5 @@
 import type { Activity } from "@/types/strava";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Map, {
   Layer,
   Source,
@@ -40,7 +40,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
   } | null>(null);
   const [years, setYears] = useState<{ year: number; checked: boolean }[]>([]);
   const [page, setPage] = useState(1);
-  const [displayedRoutes, setDisplayedRoutes] = useState(routes);
+  // const [displayedRoutes, setDisplayedRoutes] = useState(routes);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -60,14 +60,12 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
     setPage(nextPage);
   }
 
-  useEffect(() => {
+  const displayedRoutes = useMemo(() => {
     const selectedYears = years.filter((y) => y.checked).map((y) => y.year);
-    const filteredRoutes = routes.filter((route) =>
+    return routes.filter((route) =>
       selectedYears.includes(new Date(route.start_date).getFullYear())
     );
-
-    setDisplayedRoutes(filteredRoutes);
-  }, [years]);
+  }, [years, routes]);
 
   const fetchActivities = async (page = 1, year?: number) => {
     setLoading(true);
@@ -191,7 +189,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
       </div>
       <div className="absolute bottom-2 left-5 z-20">
         <Card className="px-2">
-          Showing your last {displayedRoutes?.length} activities
+          Showing {displayedRoutes?.length} of {routes?.length} activities
           <Button onClick={fetchMoreActivities}>Load more</Button>
         </Card>
       </div>
