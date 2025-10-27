@@ -150,8 +150,13 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
 
       if (clickedRoute && routes) {
         setClickedPoint(e.lngLat);
-        const index = Number(clickedRoute.split("_")[1]);
-        setSelectedActivity(routes[index]);
+        const foundRoute = routes.find((route) => String(route.id) === clickedRoute)
+
+        if (foundRoute) {
+          setSelectedActivity(foundRoute);
+        } else {
+          setSelectedActivity(null)
+        }
       }
     } else {
       setSelectedActivity(null);
@@ -209,15 +214,15 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
           onMouseLeave={handlePointerChange}
           cursor={cursor}
           interactiveLayerIds={
-            displayedRoutes?.map((_, index) => `route_${index}`) || []
+            displayedRoutes?.map((route) => String(route.id)) || []
           }
           style={{ zIndex: 10 }}
         >
           <></>
           <NavigationControl />
           {displayedRoutes &&
-            displayedRoutes.map((route, index) => {
-              const routeId = `route_${index}`;
+            displayedRoutes.map((route) => {
+              const routeId = String(route.id);
               const coordinates = decode(route.map.summary_polyline).map(
                 (coord) => [coord[1], coord[0]]
               );

@@ -127,3 +127,11 @@
 .activity-popup .mapboxgl-popup-content {
   @apply rounded-lg p-3;
 }
+
+button.mapboxgl-popup-close-button {
+  @apply mr-2;
+
+  span {
+    @apply text-lg;
+  }
+}
