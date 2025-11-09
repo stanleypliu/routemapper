@@ -130,6 +130,14 @@ export function useStravaAuth() {
     window.open(oauthUrl);
   }
 
+  function logout() {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("expiresAt");
+    setAccessToken(null);
+    setCurrentView("homeScreen");
+  }
+
   return {
     currentView,
     authenticating,
@@ -138,5 +146,6 @@ export function useStravaAuth() {
     error,
     authenticateWithStrava,
     setCurrentView,
+    logout,
   };
 }

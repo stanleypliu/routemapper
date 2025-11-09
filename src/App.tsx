@@ -18,6 +18,7 @@ function App() {
     error,
     authenticateWithStrava,
     setCurrentView,
+    logout,
   } = useStravaAuth();
 
   function LoadingSpinner() {
@@ -87,7 +88,7 @@ function App() {
             </div>
           )}
           {currentView === "authenticated" && accessToken && (
-            <MapboxMap accessToken={accessToken} />
+            <MapboxMap accessToken={accessToken} logout={logout} />
           )}
         </div>
       </div>

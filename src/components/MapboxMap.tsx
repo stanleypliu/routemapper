@@ -16,12 +16,28 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { useStravaActivities } from "@/hooks/useStravaActivities";
 import { useMapInteraction } from "@/hooks/useMapInteraction";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
-const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
+const MapboxMap = ({
+  accessToken,
+  logout,
+}: {
+  accessToken: string | null;
+  logout: () => void;
+}) => {
   const {
     routes,
     loading,
@@ -86,6 +102,24 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
               ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+      <div className="absolute top-2 left-35 z-20">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive">Remove my data</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your data will be removed and you will need to grant Strava
+              permission again in order to use Routemapper.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={logout}>Continue</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
       <div className="absolute bottom-2 left-5 z-20">
         <Card className="px-2">
