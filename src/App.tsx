@@ -60,6 +60,7 @@ function App() {
 
   useEffect(() => {
     if (
+      accessToken &&
       localStorage.getItem("expiresAt") &&
       localStorage.getItem("refreshToken")
     ) {
@@ -67,6 +68,8 @@ function App() {
 
       if (expiresAt * 1000 < Date.now()) {
         exchangeToken();
+      } else {
+        setCurrentView("authenticated");
       }
 
       setCheckingAccessToken(false);
