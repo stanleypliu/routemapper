@@ -150,12 +150,14 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
 
       if (clickedRoute && routes) {
         setClickedPoint(e.lngLat);
-        const foundRoute = routes.find((route) => String(route.id) === clickedRoute)
+        const foundRoute = routes.find(
+          (route) => String(route.id) === clickedRoute
+        );
 
         if (foundRoute) {
           setSelectedActivity(foundRoute);
         } else {
-          setSelectedActivity(null)
+          setSelectedActivity(null);
         }
       }
     } else {

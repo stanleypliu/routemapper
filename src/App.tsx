@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { LoaderIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { LoaderIcon, AlertCircleIcon, InfoIcon } from "lucide-react";
 
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Success from "./components/Success";
-import MapboxMap from "./components/MapboxMap";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Redirect from "@/components/Redirect";
+import MapboxMap from "@/components/MapboxMap";
 
 import Background from "@/assets/background.png";
 
@@ -15,10 +16,9 @@ function App() {
   const [accessToken, setAccessToken] = useState<string | null>(() => {
     return localStorage.getItem("accessToken");
   });
-  const isExchanging = useRef(false);
+  const [error, setError] = useState<string>();
 
   async function exchangeToken(code?: string) {
-    isExchanging.current = true;
     try {
       const params: Record<string, string> = {
         client_secret: import.meta.env.VITE_CLIENT_SECRET,
@@ -52,9 +52,9 @@ function App() {
       setCurrentView("authenticated");
     } catch (error: any) {
       console.error(error.message);
+      setError(error.message);
     } finally {
       setAuthenticating(false);
-      isExchanging.current = false;
     }
   }
 
@@ -74,10 +74,18 @@ function App() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const codeParam = urlParams.get("code");
+    const errorParam = urlParams.get("error");
 
     if (codeParam && window.opener) {
       window.opener.postMessage(
         { type: "strava-auth-code", code: codeParam },
+        window.location.origin
+      );
+    }
+
+    if (errorParam && window.opener) {
+      window.opener.postMessage(
+        { type: "strava-permission-denied" },
         window.location.origin
       );
     }
@@ -87,12 +95,15 @@ function App() {
         return;
       }
 
-      if (
-        event.data?.type === "strava-auth-code" &&
-        event.data?.code &&
-        !isExchanging.current
-      ) {
+      if (event.data?.type === "strava-auth-code" && event.data?.code) {
         await exchangeToken(event.data.code);
+      }
+
+      if (event.data.type === "strava-permission-denied") {
+        setError(
+          "Access denied. You need to give Strava permission to access your activities."
+        );
+        setAuthenticating(false);
       }
     }
 
@@ -104,8 +115,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (window.location.pathname.includes("/success")) {
-      setCurrentView("success");
+    if (window.location.pathname.includes("/redirect")) {
+      if (window.location.search.includes("error")) {
+        setCurrentView("failure");
+      } else {
+        setCurrentView("success");
+      }
     }
   }, [window.location.pathname]);
 
@@ -116,7 +131,7 @@ function App() {
       import.meta.env.VITE_CLIENT_ID
     }&response_type=code&redirect_uri=${
       window.location.href
-    }success&approval_prompt=auto&scope=activity:read`;
+    }redirect&approval_prompt=auto&scope=activity:read`;
 
     window.open(oauthUrl);
   }
@@ -138,7 +153,8 @@ function App() {
           </>
         )}
         <div className="relative z-10">
-          {currentView === "success" && <Success />}
+          {currentView === "success" && <Redirect state="success" />}
+          {currentView === "failure" && <Redirect state="failure" />}
           {currentView === "homeScreen" && (
             <div className="flex justify-center items-center w-screen h-screen">
               <div className="min-w-xl">
@@ -146,20 +162,26 @@ function App() {
                   RouteMapper
                 </h1>
                 <Card>
-                  {!accessToken && (
-                    <CardHeader>
+                  <CardHeader>
+                    {!accessToken && (
                       <h2 className="text-2xl text-center font-bold">
                         Authenticate With Strava
                       </h2>
-                    </CardHeader>
-                  )}
-                  {accessToken && checkingAccessToken && (
-                    <CardHeader>
-                      <h2 className="text-2xl text-center font-bold">
-                        Checking Access Token...
-                      </h2>
-                    </CardHeader>
-                  )}
+                    )}
+                    {accessToken && checkingAccessToken && (
+                      <Alert>
+                        <InfoIcon />
+                        <AlertTitle>Checking Access Token...</AlertTitle>
+                      </Alert>
+                    )}
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertCircleIcon />
+                        <AlertTitle>An error occurred</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+                  </CardHeader>
                   <CardContent className="flex justify-center">
                     <Button
                       className="uppercase text-white cursor-pointer"
