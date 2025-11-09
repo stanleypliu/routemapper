@@ -1,13 +1,10 @@
-import type { Activity } from "@/types/strava";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import Map, {
   Layer,
   Source,
   NavigationControl,
   Popup,
-  type LngLat,
 } from "react-map-gl/mapbox";
-import type { MapMouseEvent } from "react-map-gl/mapbox";
 import { LoaderIcon } from "lucide-react";
 import { decode } from "@googlemaps/polyline-codec";
 
@@ -18,27 +15,34 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Button } from "./ui/button";
+import { useStravaActivities } from "@/hooks/useStravaActivities";
+import { useMapInteraction } from "@/hooks/useMapInteraction";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
-import { COLORS, formatDateTime } from "@/lib/utils";
-import { Button } from "./ui/button";
-
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
-  const [routes, setRoutes] = useState<Activity[]>([]);
-  const [clickedPoint, setClickedPoint] = useState<LngLat | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [cursor, setCursor] = useState("auto");
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
-    null
-  );
+  const {
+    routes,
+    loading,
+    years,
+    displayedRoutes,
+    fetchMoreActivities,
+    handleYearChange,
+  } = useStravaActivities(accessToken);
+  const {
+    clickedPoint,
+    cursor,
+    selectedActivity,
+    handleMapClick,
+    handlePointerChange,
+    closePopup,
+  } = useMapInteraction(routes);
   const [initialViewState, setInitialViewState] = useState<{
     longitude: number;
     latitude: number;
     zoom: number;
   } | null>(null);
-  const [years, setYears] = useState<{ year: number; checked: boolean }[]>([]);
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -51,126 +55,6 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
       });
     }
   }, []);
-
-  async function fetchMoreActivities() {
-    const nextPage = page + 1;
-    await fetchActivities(nextPage);
-    setPage(nextPage);
-  }
-
-  const displayedRoutes = useMemo(() => {
-    const selectedYears = years.filter((y) => y.checked).map((y) => y.year);
-    return routes.filter((route) =>
-      selectedYears.includes(new Date(route.start_date).getFullYear())
-    );
-  }, [years, routes]);
-
-  async function fetchActivities(page = 1, year?: number) {
-    setLoading(true);
-    try {
-      const url = new URL("https://www.strava.com/api/v3/athlete/activities");
-
-      url.searchParams.append("page", String(page));
-
-      if (year) {
-        const startOfYear = Math.floor(new Date(year, 0, 1).getTime() / 1000);
-        const endOfYear = Math.floor(
-          new Date(year, 11, 31, 23, 59, 59).getTime() / 1000
-        );
-        url.searchParams.append("before", String(endOfYear));
-        url.searchParams.append("after", String(startOfYear));
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch activities: ${response.status}`);
-      }
-      const activities: Activity[] = await response.json();
-      const filteredRoutes = activities.filter(
-        (activity) => activity.map && activity.map.summary_polyline
-      );
-      const routesWithColor = filteredRoutes.map((route) => ({
-        ...route,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      }));
-      if (!routes || routes.length === 0) {
-        setRoutes(routesWithColor);
-      } else {
-        setRoutes(routes.concat(routesWithColor));
-      }
-    } catch (error) {
-      console.error("Error fetching activities:", error);
-    }
-    setLoading(false);
-  }
-
-  function handleYearChange(year: number) {
-    setYears((prevYears) => {
-      return prevYears.map((yearObject) =>
-        yearObject.year === year
-          ? { ...yearObject, checked: !yearObject.checked }
-          : yearObject
-      );
-    });
-  }
-
-  useEffect(() => {
-    const newYears = [
-      ...new Set(
-        routes.map((route) => new Date(route.start_date).getFullYear())
-      ),
-    ];
-
-    setYears((prevYears) => {
-      const existingYears = prevYears.map((y) => y.year);
-      const yearsToAdd = newYears.filter(
-        (year) => !existingYears.includes(year)
-      );
-
-      return [
-        ...prevYears,
-        ...yearsToAdd.map((year) => ({ year, checked: true })),
-      ];
-    });
-  }, [routes]);
-
-  useEffect(() => {
-    if (accessToken) {
-      fetchActivities();
-    }
-  }, [accessToken]);
-
-  function handleMapClick(e: MapMouseEvent) {
-    if (e.features && e.features.length > 0) {
-      const clickedRoute = e.features[0].layer?.id;
-
-      if (clickedRoute && routes) {
-        setClickedPoint(e.lngLat);
-        const foundRoute = routes.find(
-          (route) => String(route.id) === clickedRoute
-        );
-
-        if (foundRoute) {
-          setSelectedActivity({
-            ...foundRoute,
-            start_date: formatDateTime(foundRoute.start_date),
-          });
-        } else {
-          setSelectedActivity(null);
-        }
-      }
-    } else {
-      setSelectedActivity(null);
-    }
-  }
-
-  function handlePointerChange() {
-    cursor === "pointer" ? setCursor("auto") : setCursor("pointer");
-  }
 
   return (
     <div className="w-screen h-screen bg-neutral-400">
@@ -265,7 +149,7 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
               latitude={clickedPoint?.lat || 100}
               key={selectedActivity.id}
               anchor="bottom"
-              onClose={() => setSelectedActivity(null)}
+              onClose={closePopup}
             >
               <h4 className="text-lg">{selectedActivity.name}</h4>
               <p className="mb-3 font-bold">{selectedActivity.start_date}</p>
