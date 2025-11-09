@@ -21,7 +21,7 @@ import {
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
-import { COLORS } from "@/lib/utils";
+import { COLORS, formatDateTime } from "@/lib/utils";
 import { Button } from "./ui/button";
 
 const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
@@ -155,7 +155,10 @@ const MapboxMap = ({ accessToken }: { accessToken: string | null }) => {
         );
 
         if (foundRoute) {
-          setSelectedActivity(foundRoute);
+          setSelectedActivity({
+            ...foundRoute,
+            start_date: formatDateTime(foundRoute.start_date),
+          });
         } else {
           setSelectedActivity(null);
         }
