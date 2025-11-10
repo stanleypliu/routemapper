@@ -24,8 +24,20 @@ type AuthAction =
   | { type: "SET_VIEW"; payload: AuthState["view"] }
   | { type: "TOKEN_CHECK_COMPLETE" };
 
+function getInitialView() {
+  if (window.location.pathname.includes("/redirect")) {
+    if (window.location.search.includes("error")) {
+      return "failure";
+    } else {
+      return "success";
+    }
+  } else {
+    return "homeScreen";
+  }
+}
+
 const initialState: AuthState = {
-  view: "homeScreen",
+  view: getInitialView(),
   isAuthenticating: false,
   isCheckingToken: true,
   accessToken: localStorage.getItem("accessToken"),
@@ -166,16 +178,6 @@ export function useStravaAuth() {
     return () => {
       window.removeEventListener("message", handleAuthMessage);
     };
-  }, []);
-
-  useEffect(() => {
-    if (window.location.pathname.includes("/redirect")) {
-      if (window.location.search.includes("error")) {
-        dispatch({ type: "SET_VIEW", payload: "failure" });
-      } else {
-        dispatch({ type: "SET_VIEW", payload: "success" });
-      }
-    }
   }, []);
 
   function authenticateWithStrava() {
