@@ -24,6 +24,8 @@ export function useMapInteraction(routes: Activity[]) {
           setSelectedActivity({
             ...foundRoute,
             start_date: formatDateTime(foundRoute.start_date),
+            average_speed: Math.round(foundRoute.average_speed * 3.6),
+            max_speed: Math.round(foundRoute.max_speed * 3.6),
           });
         } else {
           setSelectedActivity(null);

@@ -86,8 +86,8 @@ const MapboxMap = ({
         <div className="absolute top-0 left-0 w-screen h-screen flex justify-center items-center z-20">
           <Card className="flex-row p-3 bg-white items-center w-auto">
             <h4 className="text-xl">
-              Unfortunately, there don't seem to be any activities on your
-              account.
+              Unfortunately, there don't seem to be any activities associated
+              with your account.
             </h4>
           </Card>
         </div>
@@ -95,7 +95,9 @@ const MapboxMap = ({
       <div className="absolute top-2 left-5 z-20">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" disabled={!routes || routes.length === 0}>Select Year</Button>
+            <Button variant="outline" disabled={!routes || routes.length === 0}>
+              Select Year
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {loading && <LoaderIcon className="animate-spin" />}
@@ -205,7 +207,8 @@ const MapboxMap = ({
                   ? selectedActivity.average_heartrate + " BPM"
                   : "N/A"
               }`}</p>
-              <p>{`Average speed: ${selectedActivity.average_speed}`}</p>
+              <p>{`Average speed: ${selectedActivity.average_speed} km/h`}</p>
+              <p>{`Top speed: ${selectedActivity.max_speed} km/h`}</p>
               <p>{`Kudos ❤️: ${selectedActivity.kudos_count}`}</p>
             </Popup>
           )}
