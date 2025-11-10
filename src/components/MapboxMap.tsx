@@ -82,10 +82,20 @@ const MapboxMap = ({
           </Card>
         </div>
       )}
+      {!loading && routes.length === 0 && (
+        <div className="absolute top-0 left-0 w-screen h-screen flex justify-center items-center z-20">
+          <Card className="flex-row p-3 bg-white items-center w-auto">
+            <h4 className="text-xl">
+              Unfortunately, there don't seem to be any activities on your
+              account.
+            </h4>
+          </Card>
+        </div>
+      )}
       <div className="absolute top-2 left-5 z-20">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline">Select Year</Button>
+            <Button variant="outline" disabled={!routes || routes.length === 0}>Select Year</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {loading && <LoaderIcon className="animate-spin" />}

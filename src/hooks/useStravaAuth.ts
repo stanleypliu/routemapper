@@ -1,27 +1,85 @@
-import { useState, useEffect } from "react";
+import { useReducer, useEffect } from "react";
+
+type AuthState = {
+  view: "homeScreen" | "authenticated" | "success" | "failure";
+  isAuthenticating: boolean;
+  isCheckingToken: boolean;
+  accessToken: string | null;
+  error: string | null;
+};
+
+type AuthAction =
+  | { type: "AUTHENTICATION_START" }
+  | {
+      type: "AUTHENTICATION_SUCCESS";
+      payload: {
+        accessToken: string;
+        refreshToken: string;
+        expiresAt: number;
+      };
+    }
+  | { type: "AUTHENTICATION_FAILURE"; payload: string }
+  | { type: "TOKEN_VALID" }
+  | { type: "LOGOUT" }
+  | { type: "SET_VIEW"; payload: AuthState["view"] }
+  | { type: "TOKEN_CHECK_COMPLETE" };
+
+const initialState: AuthState = {
+  view: "homeScreen",
+  isAuthenticating: false,
+  isCheckingToken: true,
+  accessToken: localStorage.getItem("accessToken"),
+  error: null,
+};
+
+function authReducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case "AUTHENTICATION_START":
+      return { ...state, isAuthenticating: true, error: null };
+    case "AUTHENTICATION_SUCCESS":
+      localStorage.setItem("accessToken", action.payload.accessToken);
+      localStorage.setItem("refreshToken", action.payload.refreshToken);
+      localStorage.setItem("expiresAt", String(action.payload.expiresAt));
+      return {
+        ...state,
+        isAuthenticating: false,
+        accessToken: action.payload.accessToken,
+        view: "authenticated",
+      };
+    case "AUTHENTICATION_FAILURE":
+      return { ...state, isAuthenticating: false, error: action.payload };
+    case "TOKEN_VALID":
+      return { ...state, isCheckingToken: false, view: "authenticated" };
+    case "TOKEN_CHECK_COMPLETE":
+      return { ...state, isCheckingToken: false };
+    case "LOGOUT":
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("expiresAt");
+      return { ...initialState, accessToken: null, isCheckingToken: false };
+    case "SET_VIEW":
+      return { ...state, view: action.payload };
+    default:
+      return state;
+  }
+}
 
 export function useStravaAuth() {
-  const [currentView, setCurrentView] = useState("homeScreen");
-  const [authenticating, setAuthenticating] = useState(false);
-  const [checkingAccessToken, setCheckingAccessToken] = useState(true);
-  const [accessToken, setAccessToken] = useState<string | null>(() => {
-    return localStorage.getItem("accessToken");
-  });
-  const [error, setError] = useState<string>();
+  const [state, dispatch] = useReducer(authReducer, initialState);
 
   async function exchangeToken(code?: string) {
     try {
       const params: Record<string, string> = {
         client_secret: import.meta.env.VITE_CLIENT_SECRET,
         client_id: import.meta.env.VITE_CLIENT_ID,
-        grant_type: accessToken ? "refresh_token" : "authorization_code",
+        grant_type: state.accessToken ? "refresh_token" : "authorization_code",
       };
 
-      if (!accessToken && code) {
+      if (!state.accessToken && code) {
         params.code = code;
       }
 
-      if (accessToken && localStorage.getItem("refreshToken")) {
+      if (state.accessToken && localStorage.getItem("refreshToken")) {
         params.refresh_token = localStorage.getItem("refreshToken") as string;
       }
 
@@ -36,22 +94,23 @@ export function useStravaAuth() {
 
       const result = await response.json();
 
-      localStorage.setItem("accessToken", result.access_token);
-      setAccessToken(result.access_token);
-      localStorage.setItem("refreshToken", result.refresh_token);
-      localStorage.setItem("expiresAt", result.expires_at);
-      setCurrentView("authenticated");
+      dispatch({
+        type: "AUTHENTICATION_SUCCESS",
+        payload: {
+          accessToken: result.access_token,
+          refreshToken: result.refresh_token,
+          expiresAt: result.expires_at,
+        },
+      });
     } catch (error: any) {
       console.error(error.message);
-      setError(error.message);
-    } finally {
-      setAuthenticating(false);
+      dispatch({ type: "AUTHENTICATION_FAILURE", payload: error.message });
     }
   }
 
   useEffect(() => {
     if (
-      accessToken &&
+      state.accessToken &&
       localStorage.getItem("expiresAt") &&
       localStorage.getItem("refreshToken")
     ) {
@@ -60,10 +119,10 @@ export function useStravaAuth() {
       if (expiresAt * 1000 < Date.now()) {
         exchangeToken();
       } else {
-        setCurrentView("authenticated");
+        dispatch({ type: "TOKEN_VALID" });
       }
-
-      setCheckingAccessToken(false);
+    } else {
+      dispatch({ type: "TOKEN_CHECK_COMPLETE" });
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -94,10 +153,11 @@ export function useStravaAuth() {
       }
 
       if (event.data.type === "strava-permission-denied") {
-        setError(
-          "Access denied. You need to give Strava permission to access your activities."
-        );
-        setAuthenticating(false);
+        dispatch({
+          type: "AUTHENTICATION_FAILURE",
+          payload:
+            "Access denied. You need to give Strava permission to access your activities.",
+        });
       }
     }
 
@@ -111,41 +171,38 @@ export function useStravaAuth() {
   useEffect(() => {
     if (window.location.pathname.includes("/redirect")) {
       if (window.location.search.includes("error")) {
-        setCurrentView("failure");
+        dispatch({ type: "SET_VIEW", payload: "failure" });
       } else {
-        setCurrentView("success");
+        dispatch({ type: "SET_VIEW", payload: "success" });
       }
     }
-  }, [window.location.pathname]);
+  }, []);
 
   function authenticateWithStrava() {
-    setAuthenticating(true);
+    dispatch({ type: "AUTHENTICATION_START" });
 
     const oauthUrl = `http://www.strava.com/oauth/authorize?client_id=${
       import.meta.env.VITE_CLIENT_ID
     }&response_type=code&redirect_uri=${
-      window.location.href
-    }redirect&approval_prompt=auto&scope=activity:read`;
+      window.location.origin
+    }/redirect&approval_prompt=auto&scope=activity:read`;
 
     window.open(oauthUrl);
   }
 
   function logout() {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("expiresAt");
-    setAccessToken(null);
-    setCurrentView("homeScreen");
+    dispatch({ type: "LOGOUT" });
   }
 
   return {
-    currentView,
-    authenticating,
-    checkingAccessToken,
-    accessToken,
-    error,
+    currentView: state.view,
+    authenticating: state.isAuthenticating,
+    checkingAccessToken: state.isCheckingToken,
+    accessToken: state.accessToken,
+    error: state.error,
     authenticateWithStrava,
-    setCurrentView,
+    setCurrentView: (view: AuthState["view"]) =>
+      dispatch({ type: "SET_VIEW", payload: view }),
     logout,
   };
 }
